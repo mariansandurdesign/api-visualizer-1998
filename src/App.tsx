@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { AnimationEvent, ReactNode } from "react";
 import { JsonTree } from "./components/JsonTree";
 import { CopyButton } from "./components/CopyButton";
 import { parseJson } from "./utils/jsonParser";
@@ -11,6 +12,7 @@ const STORAGE_KEY = "api-response-visualizer:jsonlens:last-json";
 const OUTPUT_TABS = ["TYPESCRIPT", "ZOD", "FETCH()"] as const;
 
 type OutputTab = (typeof OUTPUT_TABS)[number];
+type WindowState = "open" | "closing" | "closed";
 
 function App() {
   const [jsonInput, setJsonInput] = useState(() => {
@@ -18,6 +20,7 @@ function App() {
     return localStorage.getItem(STORAGE_KEY) ?? SAMPLE_JSON;
   });
   const [outputTab, setOutputTab] = useState<OutputTab>("TYPESCRIPT");
+  const [windowState, setWindowState] = useState<WindowState>("open");
 
   const parsed = useMemo(() => {
     const startedAt = performance.now();
@@ -82,162 +85,258 @@ function App() {
     return "COPY TYPES";
   }
 
+  function closeWindow() {
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setWindowState(prefersReducedMotion ? "closed" : "closing");
+  }
+
+  function handleWindowAnimationEnd(event: AnimationEvent<HTMLElement>) {
+    if (event.animationName === "windowClose") {
+      setWindowState("closed");
+    }
+  }
+
+  const isWindowVisible = windowState !== "closed";
+
   return (
     <main className="app-shell">
-      <section
-        className="xp-window"
-        aria-label="JSONLENS API response visualizer"
-      >
-        <div className="xp-titlebar">
-          <div className="xp-title">JSONLENS.EXE - members.json</div>
-          <div className="xp-window-controls" aria-hidden="true">
-            <span className="xp-control minimize">-</span>
-            <span className="xp-control maximize">□</span>
-            <span className="xp-control close">x</span>
-          </div>
-        </div>
-
-        <nav className="menu-bar" aria-label="Application menu">
-          {["File", "Edit", "Tree", "Schema", "Help"].map((item) => (
-            <button type="button" key={item}>
-              {item}
-            </button>
-          ))}
-        </nav>
-
-        <div className="request-bar" aria-label="Request controls">
-          <button className="method-button" type="button">
-            GET <span aria-hidden="true">▼</span>
-          </button>
-          <input
-            className="url-input"
-            value="https://api.acme.dev/v2/workspaces/8871/members"
-            readOnly
-            aria-label="API endpoint URL"
-          />
-          <label className="enum-toggle">
-            <input type="checkbox" defaultChecked /> INFER ENUMS
-          </label>
-          <button
-            className="chrome-button"
-            type="button"
-            onClick={formatJson}
-            disabled={!parsed.ok}
-          >
-            RE-PARSE
-          </button>
-          <CopyButton
-            value={displayedCode}
-            label={`${copyTypesLabel()} ▶`}
-            className="copy-types"
-          />
-        </div>
-
-        <div className="lens-grid">
-          <section className="raw-column">
-            <PanelTitle>
-              RAW RESPONSE{" "}
-              <span>
-                (
-                {jsonInput === SAMPLE_JSON
-                  ? "18.4 KB"
-                  : formatByteSize(jsonInput)}
-                )
-              </span>
-            </PanelTitle>
-            <textarea
-              className="raw-editor"
-              value={jsonInput}
-              onChange={(event) => setJsonInput(event.target.value)}
-              spellCheck={false}
-              aria-label="Raw JSON response"
-            />
-            <div
-              className={
-                parsed.ok ? "parse-strip" : "parse-strip parse-strip-error"
-              }
-            >
-              {parsed.ok
-                ? `PARSED IN ${parsed.elapsedMs} ms • ${stats.records} RECORDS • ${stats.nodes.toLocaleString()} NODES`
-                : formatParseError(parsed.error)}
-            </div>
-          </section>
-
-          <section className="tree-column">
-            <PanelTitle>TREE VIEW</PanelTitle>
-            <div className="tree-screen">
-              {parsed.ok ? (
-                <JsonTree value={parsed.value} />
-              ) : (
-                <div className="tree-error">
-                  {formatParseError(parsed.error)}
-                </div>
-              )}
-              <div className="tree-actions">
-                <button type="button">EXPAND ALL</button>
-                <button type="button">COLLAPSE ALL</button>
-                <button type="button">FIND...</button>
-              </div>
-            </div>
-            <div className="metric-grid">
-              <MetricCard label="NODES" value={stats.nodes.toLocaleString()} />
-              <MetricCard label="MAX DEPTH" value={stats.maxDepth.toString()} />
-              <MetricCard
-                label="NULLABLE"
-                value={stats.nullable.toString()}
-                warning
+      <LandingPage
+        isActive={!isWindowVisible}
+        onOpen={() => setWindowState("open")}
+      />
+      {isWindowVisible ? (
+        <section
+          className={`xp-window ${windowState === "closing" ? "is-closing" : ""}`}
+          aria-label="API Visualizer 98 response visualizer"
+          onAnimationEnd={handleWindowAnimationEnd}
+        >
+          <div className="xp-titlebar">
+            <div className="xp-title">
+              <img
+                className="titlebar-mark"
+                src="/favicon.svg"
+                alt=""
+                aria-hidden="true"
               />
+              <span>API VISUALIZER 98 - members.json</span>
             </div>
-          </section>
+            <div className="xp-window-controls">
+              <button
+                className="xp-control minimize"
+                type="button"
+                aria-label="Minimize window"
+              >
+                -
+              </button>
+              <button
+                className="xp-control maximize"
+                type="button"
+                aria-label="Maximize window"
+              >
+                □
+              </button>
+              <button
+                className="xp-control close"
+                type="button"
+                aria-label="Close window"
+                onClick={closeWindow}
+              >
+                x
+              </button>
+            </div>
+          </div>
 
-          <section className="types-column">
-            <div
-              className="output-tabs"
-              role="tablist"
-              aria-label="Generated output"
+          <nav className="menu-bar" aria-label="Application menu">
+            {["File", "Edit", "Tree", "Schema", "Help"].map((item) => (
+              <button type="button" key={item}>
+                {item}
+              </button>
+            ))}
+          </nav>
+
+          <div className="request-bar" aria-label="Request controls">
+            <button className="method-button" type="button">
+              GET <span aria-hidden="true">▼</span>
+            </button>
+            <input
+              className="url-input"
+              value="https://api.acme.dev/v2/workspaces/8871/members"
+              readOnly
+              aria-label="API endpoint URL"
+            />
+            <label className="enum-toggle">
+              <input type="checkbox" defaultChecked /> INFER ENUMS
+            </label>
+            <button
+              className="chrome-button"
+              type="button"
+              onClick={formatJson}
+              disabled={!parsed.ok}
             >
-              {OUTPUT_TABS.map((tab) => (
-                <button
-                  key={tab}
-                  className={
-                    outputTab === tab ? "output-tab active" : "output-tab"
-                  }
-                  type="button"
-                  role="tab"
-                  aria-selected={outputTab === tab}
-                  onClick={() => setOutputTab(tab)}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-            <pre className="type-output">{displayedCode}</pre>
-            <aside className="notes-panel">
-              <h2>! INFERENCE NOTES</h2>
-              {inferenceNotes.map((note) => (
-                <p key={note}>{note}</p>
-              ))}
-            </aside>
-          </section>
-        </div>
+              RE-PARSE
+            </button>
+            <CopyButton
+              value={displayedCode}
+              label={`${copyTypesLabel()} ▶`}
+              className="copy-types"
+            />
+          </div>
 
-        <footer className="status-bar">
-          <div>
-            <span>{parsed.ok ? "READY" : "ERROR"}</span>
-            <span>{schema ? "SCHEMA VALID" : "SCHEMA BLOCKED"}</span>
+          <div className="lens-grid">
+            <section className="raw-column">
+              <PanelTitle>
+                RAW RESPONSE{" "}
+                <span>
+                  (
+                  {jsonInput === SAMPLE_JSON
+                    ? "18.4 KB"
+                    : formatByteSize(jsonInput)}
+                  )
+                </span>
+              </PanelTitle>
+              <textarea
+                className="raw-editor"
+                value={jsonInput}
+                onChange={(event) => setJsonInput(event.target.value)}
+                spellCheck={false}
+                aria-label="Raw JSON response"
+              />
+              <div
+                className={
+                  parsed.ok ? "parse-strip" : "parse-strip parse-strip-error"
+                }
+              >
+                {parsed.ok
+                  ? `PARSED IN ${parsed.elapsedMs} ms • ${stats.records} RECORDS • ${stats.nodes.toLocaleString()} NODES`
+                  : formatParseError(parsed.error)}
+              </div>
+            </section>
+
+            <section className="tree-column">
+              <PanelTitle>TREE VIEW</PanelTitle>
+              <div className="tree-screen">
+                {parsed.ok ? (
+                  <JsonTree value={parsed.value} />
+                ) : (
+                  <div className="tree-error">
+                    {formatParseError(parsed.error)}
+                  </div>
+                )}
+                <div className="tree-actions">
+                  <button type="button">EXPAND ALL</button>
+                  <button type="button">COLLAPSE ALL</button>
+                  <button type="button">FIND...</button>
+                </div>
+              </div>
+              <div className="metric-grid">
+                <MetricCard
+                  label="NODES"
+                  value={stats.nodes.toLocaleString()}
+                />
+                <MetricCard
+                  label="MAX DEPTH"
+                  value={stats.maxDepth.toString()}
+                />
+                <MetricCard
+                  label="NULLABLE"
+                  value={stats.nullable.toString()}
+                  warning
+                />
+              </div>
+            </section>
+
+            <section className="types-column">
+              <div
+                className="output-tabs"
+                role="tablist"
+                aria-label="Generated output"
+              >
+                {OUTPUT_TABS.map((tab) => (
+                  <button
+                    key={tab}
+                    className={
+                      outputTab === tab ? "output-tab active" : "output-tab"
+                    }
+                    type="button"
+                    role="tab"
+                    aria-selected={outputTab === tab}
+                    onClick={() => setOutputTab(tab)}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+              <pre className="type-output">{displayedCode}</pre>
+              <aside className="notes-panel">
+                <h2>! INFERENCE NOTES</h2>
+                {inferenceNotes.map((note) => (
+                  <p key={note}>{note}</p>
+                ))}
+              </aside>
+            </section>
           </div>
-          <div>
-            <span>{stats.nullable} NULLABLE KEYS</span>
-            <span>•</span>
-            <span>{stats.enumCandidates} ENUM INFERRED</span>
-          </div>
-        </footer>
-      </section>
+
+          <footer className="status-bar">
+            <div>
+              <span>{parsed.ok ? "READY" : "ERROR"}</span>
+              <span>{schema ? "SCHEMA VALID" : "SCHEMA BLOCKED"}</span>
+            </div>
+            <div>
+              <span>{stats.nullable} NULLABLE KEYS</span>
+              <span>•</span>
+              <span>{stats.enumCandidates} ENUM INFERRED</span>
+            </div>
+          </footer>
+        </section>
+      ) : null}
     </main>
   );
 }
 
-function PanelTitle({ children }: { children: React.ReactNode }) {
+function LandingPage({
+  isActive,
+  onOpen,
+}: {
+  isActive: boolean;
+  onOpen: () => void;
+}) {
+  return (
+    <section
+      className="landing-page"
+      aria-label="API Visualizer 98 landing page"
+      aria-hidden={!isActive}
+      inert={!isActive ? true : undefined}
+    >
+      <div className="desktop-pattern" aria-hidden="true" />
+      <div className="landing-content">
+        <img
+          className="landing-logo"
+          src="/api-visualizer-98-logo.svg"
+          alt="API Visualizer 98"
+        />
+        <p>
+          A Windows 98-styled developer tool for inspecting JSON, inferring
+          schemas, and generating TypeScript from API responses.
+        </p>
+        <div className="landing-actions">
+          <button
+            className="chrome-button launch-button"
+            type="button"
+            onClick={onOpen}
+            tabIndex={isActive ? 0 : -1}
+          >
+            OPEN JSONLENS.EXE
+          </button>
+          <span>READY - LOCAL FIRST - MIT</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PanelTitle({ children }: { children: ReactNode }) {
   return <h2 className="panel-title">{children}</h2>;
 }
 
