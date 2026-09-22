@@ -1,11 +1,49 @@
 {
-  "name": "api-response-visualizer",
-  "private": true,
+  "name": "jsonlens-api-response-visualizer",
   "version": "0.1.0",
+  "description": "Windows XP-style API response visualizer with JSON tree viewing, schema inference, TypeScript generation, and reusable JSON inference utilities.",
   "type": "module",
+  "license": "MIT",
+  "author": "mariansandurdesign",
+  "homepage": "https://api-visualizer-1998.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mariansandurdesign/api-visualizer-1998.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mariansandurdesign/api-visualizer-1998/issues"
+  },
+  "keywords": [
+    "json",
+    "schema",
+    "typescript",
+    "api",
+    "visualizer",
+    "json-tree",
+    "schema-inference"
+  ],
+  "sideEffects": false,
+  "main": "./dist-lib/index.cjs",
+  "module": "./dist-lib/index.js",
+  "types": "./dist-lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist-lib/types/index.d.ts",
+      "import": "./dist-lib/index.js",
+      "require": "./dist-lib/index.cjs"
+    }
+  },
+  "files": [
+    "dist-lib",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "build": "tsc -b && vite build",
+    "build": "npm run build:app && npm run build:lib",
+    "build:app": "tsc -b && vite build",
+    "build:lib": "vite build --config vite.lib.config.ts && tsc -p tsconfig.lib.json",
+    "prepare": "npm run build:lib",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "format": "prettier --write ."
